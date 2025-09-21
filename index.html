@@ -70,6 +70,7 @@
             padding: 20px;
             border-radius: 10px;
             box-shadow: var(--shadow);
+            position: relative;
         }
         
         .section-title {
@@ -104,16 +105,44 @@
             background-color: #e8f4fc;
         }
         
-        .file-content {
+        .file-content-container {
+            position: relative;
             width: 100%;
             height: 300px;
-            padding: 12px;
+            overflow: auto;
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            resize: vertical;
             font-family: 'Courier New', Courier, monospace;
             font-size: 14px;
             line-height: 1.5;
+        }
+        
+        .line-numbers {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 40px;
+            background-color: #f1f3f5;
+            padding: 12px 5px;
+            text-align: right;
+            border-right: 1px solid var(--border-color);
+            color: #6c757d;
+            user-select: none;
+            overflow: hidden;
+        }
+        
+        .file-content {
+            width: 100%;
+            height: 100%;
+            padding: 12px 12px 12px 55px;
+            border: none;
+            resize: none;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre;
+            overflow: auto;
         }
         
         .compare-btn {
@@ -180,11 +209,27 @@
         }
         
         .line-number {
-            width: 40px;
+            width: 80px;
             color: #6c757d;
             text-align: right;
             padding-right: 10px;
             user-select: none;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .line-number span {
+            display: inline-block;
+            width: 35px;
+            text-align: center;
+        }
+        
+        .line-number .line1 {
+            color: var(--accent-color);
+        }
+        
+        .line-number .line2 {
+            color: var(--secondary-color);
         }
         
         .line-content {
@@ -278,7 +323,10 @@
             <div class="file-input-container">
                 <input type="file" id="file1" class="file-input" accept=".txt,.js,.html,.css,.py,.java,.cpp,.c,.cs,.php">
             </div>
-            <textarea class="file-content" id="content1" placeholder="محتوای فایل اول اینجا نمایش داده می‌شود..."></textarea>
+            <div class="file-content-container">
+                <div class="line-numbers" id="line-numbers1"></div>
+                <textarea class="file-content" id="content1" placeholder="محتوای فایل اول اینجا نمایش داده می‌شود..." oninput="updateLineNumbers('content1', 'line-numbers1')" onscroll="syncScroll('content1', 'line-numbers1')"></textarea>
+            </div>
         </div>
         
         <div class="file-section">
@@ -288,7 +336,10 @@
             <div class="file-input-container">
                 <input type="file" id="file2" class="file-input" accept=".txt,.js,.html,.css,.py,.java,.cpp,.c,.cs,.php">
             </div>
-            <textarea class="file-content" id="content2" placeholder="محتوای فایل دوم اینجا نمایش داده می‌شود..."></textarea>
+            <div class="file-content-container">
+                <div class="line-numbers" id="line-numbers2"></div>
+                <textarea class="file-content" id="content2" placeholder="محتوای فایل دوم اینجا نمایش داده می‌شود..." oninput="updateLineNumbers('content2', 'line-numbers2')" onscroll="syncScroll('content2', 'line-numbers2')"></textarea>
+            </div>
         </div>
     </div>
     
@@ -335,7 +386,7 @@
     
     <footer>
         <p>ابزار مقایسه فایل‌ها - طراحی شده برای مشاهده تفاوت‌های بین دو فایل متنی</p>
-        <p>© 2023 - تمام حقوق محفوظ است</p>
+        <p>Developed by Coffee</p>
     </footer>
 
     <script>
@@ -351,13 +402,17 @@
             const addedLinesSpan = document.getElementById('added-lines');
             const removedLinesSpan = document.getElementById('removed-lines');
             
+            // Initialize line numbers
+            updateLineNumbers('content1', 'line-numbers1');
+            updateLineNumbers('content2', 'line-numbers2');
+            
             // Handle file selection
             file1Input.addEventListener('change', function(e) {
-                readFile(e.target.files[0], content1Textarea);
+                readFile(e.target.files[0], content1Textarea, 'line-numbers1');
             });
             
             file2Input.addEventListener('change', function(e) {
-                readFile(e.target.files[0], content2Textarea);
+                readFile(e.target.files[0], content2Textarea, 'line-numbers2');
             });
             
             // Compare button click
@@ -375,14 +430,36 @@
             });
             
             // Read file content
-            function readFile(file, textarea) {
+            function readFile(file, textarea, lineNumbersId) {
                 if (!file) return;
                 
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     textarea.value = e.target.result;
+                    updateLineNumbers(textarea.id, lineNumbersId);
                 };
                 reader.readAsText(file);
+            }
+            
+            // Update line numbers
+            function updateLineNumbers(textareaId, lineNumbersId) {
+                const textarea = document.getElementById(textareaId);
+                const lineNumbers = document.getElementById(lineNumbersId);
+                const lines = textarea.value.split('\n').length;
+                
+                let numbersText = '';
+                for (let i = 1; i <= lines; i++) {
+                    numbersText += i + '<br>';
+                }
+                
+                lineNumbers.innerHTML = numbersText;
+            }
+            
+            // Sync scroll between textarea and line numbers
+            function syncScroll(textareaId, lineNumbersId) {
+                const textarea = document.getElementById(textareaId);
+                const lineNumbers = document.getElementById(lineNumbersId);
+                lineNumbers.scrollTop = textarea.scrollTop;
             }
             
             // Find differences between two texts
@@ -395,17 +472,32 @@
                 
                 while (i < lines1.length || j < lines2.length) {
                     if (i < lines1.length && j < lines2.length && lines1[i] === lines2[j]) {
-                        diff.push({ type: 'unchanged', value: lines1[i], line1: i+1, line2: j+1 });
+                        diff.push({ 
+                            type: 'unchanged', 
+                            value: lines1[i], 
+                            line1: i+1, 
+                            line2: j+1 
+                        });
                         i++;
                         j++;
                     } else {
                         if (j < lines2.length && (i >= lines1.length || lines1[i] !== lines2[j])) {
-                            diff.push({ type: 'added', value: lines2[j], line1: null, line2: j+1 });
+                            diff.push({ 
+                                type: 'added', 
+                                value: lines2[j], 
+                                line1: null, 
+                                line2: j+1 
+                            });
                             j++;
                         }
                         
                         if (i < lines1.length && (j >= lines2.length || lines1[i] !== lines2[j])) {
-                            diff.push({ type: 'removed', value: lines1[i], line1: i+1, line2: null });
+                            diff.push({ 
+                                type: 'removed', 
+                                value: lines1[i], 
+                                line1: i+1, 
+                                line2: null 
+                            });
                             i++;
                         }
                     }
@@ -426,7 +518,17 @@
                     
                     const lineNumberDiv = document.createElement('div');
                     lineNumberDiv.className = 'line-number';
-                    lineNumberDiv.textContent = item.line1 || item.line2 || '';
+                    
+                    const line1Span = document.createElement('span');
+                    line1Span.className = 'line1';
+                    line1Span.textContent = item.line1 || '';
+                    
+                    const line2Span = document.createElement('span');
+                    line2Span.className = 'line2';
+                    line2Span.textContent = item.line2 || '';
+                    
+                    lineNumberDiv.appendChild(line1Span);
+                    lineNumberDiv.appendChild(line2Span);
                     
                     const lineContentDiv = document.createElement('div');
                     lineContentDiv.className = `line-content ${item.type}`;
